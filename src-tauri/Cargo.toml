@@ -1,0 +1,54 @@
+[package]
+name = "shotx"
+version = "0.1.0"
+description = "ShotX — 轻量截图贴图工具（托盘驻留，无主窗口）"
+authors = ["ShotX"]
+edition = "2021"
+
+[lib]
+name = "shotx_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 插件：全局快捷键、保存对话框、开机自启、单实例、在文件夹中显示
+tauri-plugin-global-shortcut = "2.4.1"
+tauri-plugin-dialog = "2.8.3"
+tauri-plugin-autostart = "2.7.0"
+tauri-plugin-single-instance = "2.5.4"
+tauri-plugin-opener = "2"
+
+# 图像处理与剪贴板
+image = { version = "0.25", default-features = false, features = ["png"] }
+arboard = "3"
+
+# Windows 底层 API：WGC/DXGI 截屏、DPI 感知、任务栏控制、分层窗口透明度
+[target.'cfg(windows)'.dependencies]
+windows-capture = "2.0.1"
+windows = { version = "0.62.2", features = [
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Foundation",
+    "Win32_UI_HiDpi",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Graphics_Gdi",
+    "Win32_System_DataExchange",
+    "Win32_System_Ole",
+] }
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
