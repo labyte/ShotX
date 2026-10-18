@@ -1,0 +1,89 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+          - platform: macos-latest
+            # universal：一次产出 Apple Silicon + Intel
+            rustTargets: aarch64-apple-darwin,x86_64-apple-darwin
+            tauriTarget: universal-apple-darwin
+          - platform: ubuntu-22.04
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: install Linux system dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl wget file \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rustTargets }}
+
+      - name: rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: npm install
+        run: npm ci
+
+      - name: build & release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS 暂不签名/公证：产物仅内部使用，用户需右键打开绕过 Gatekeeper。
+          # 若要正式分发，配置 APPLE_CERTIFICATE / APPLE_ID 等 secrets 后取消注释：
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: v__VERSION__
+          releaseName: "ShotX v__VERSION__"
+          releaseBody: |
+            ## ShotX v__VERSION__
+
+            类 Snipaste 轻量截图贴图工具：托盘驻留 / F1 截图 / 标注 / 贴图置顶 / 历史。
+
+            ### 安装包
+            - **Windows**: `.msi`（安装包）/ `.exe`（NSIS 安装器）
+            - **macOS**: `.dmg`（universal：Apple Silicon + Intel）/ `.app`
+              - 未做开发者签名与公证，首次打开请右键 → 打开
+            - **Linux (x86_64)**: `.deb` / `.AppImage`
+
+            > 注意：屏幕捕获目前仅 Windows 后端可用（WGC / DXGI / GDI），
+            > macOS / Linux 版本可运行但截图功能返回"平台未实现"。
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.tauriTarget && format('--target {0}', matrix.tauriTarget) || '' }}
